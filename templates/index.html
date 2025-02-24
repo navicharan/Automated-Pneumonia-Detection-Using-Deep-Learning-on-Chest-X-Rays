@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Pneumonia Detection</title>
+</head>
+<body>
+    <h2>Upload a Chest X-ray Image</h2>
+    <form id="upload-form" enctype="multipart/form-data">
+        <input type="file" name="file" id="file-input" required>
+        <button type="submit">Upload & Predict</button>
+    </form>
+
+    <h3>Prediction Result:</h3>
+    <p id="diagnosis"></p>
+    <p id="probability"></p>
+    
+    <h3>Heatmap Visualization:</h3>
+    <img id="heatmap" src="" alt="Heatmap will appear here" style="display:none; width:300px;">
+
+    <script>
+        document.getElementById("upload-form").onsubmit = async function(event) {
+            event.preventDefault();
+            let formData = new FormData();
+            formData.append("file", document.getElementById("file-input").files[0]);
+
+            let response = await fetch("/predict", {
+                method: "POST",
+                body: formData
+            });
+
+            let data = await response.json();
+            document.getElementById("diagnosis").innerText = "Diagnosis: " + data.diagnosis;
+            document.getElementById("probability").innerText = "Pneumonia Probability: " + (data.pneumonia_probability * 100).toFixed(2) + "%";
+            
+            if (data.heatmap_image) {
+                document.getElementById("heatmap").src = "/heatmap?" + new Date().getTime();  // Prevents caching issues
+                document.getElementById("heatmap").style.display = "block";
+            }
+        };
+    </script>
+</body>
+</html>

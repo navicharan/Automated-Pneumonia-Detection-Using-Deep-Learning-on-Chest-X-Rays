@@ -1,0 +1,1 @@
+"C:\\Users\\navic\\Desktop\\Projects\\pneumonia\\best_model.h5"
