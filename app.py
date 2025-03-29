@@ -3,79 +3,40 @@ import os
 import numpy as np
 import tensorflow as tf
 import cv2
-import matplotlib.pyplot as plt
+from werkzeug.utils import secure_filename
 
-app = Flask(__name__, template_folder="templates")
+app = Flask(__name__, template_folder="templates")  # Ensure Flask looks for templates
 
 UPLOAD_FOLDER = "uploads"
+HEATMAP_FOLDER = "heatmaps"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+os.makedirs(HEATMAP_FOLDER, exist_ok=True)
 
-# Load trained model
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["HEATMAP_FOLDER"] = HEATMAP_FOLDER
+
+# Load trained model from best_model.h5
+# Note: Instead of a string, load the actual model.
 MODEL_PATH = "best_model.h5"
 model = tf.keras.models.load_model(MODEL_PATH)
-model.build(input_shape=(None, 64, 64, 1))
-model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+# Explicitly build the model if needed (the input shape should match your model)
+model.build((None, 64, 64, 1))
+# Run a dummy prediction to ensure the model is initialized
+dummy_input = np.zeros((1, 64, 64, 1))
+model.predict(dummy_input)
 
-# Function to preprocess image
+# Image Preprocessing Function
 def preprocess_image(image_path):
-    img = cv2.imread(image_path)  # Load as RGB
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # Convert to grayscale
-    img = cv2.resize(img, (64, 64))  # Resize to model input size
-    img = np.expand_dims(img, axis=-1)  # Add channel dimension (1 channel for grayscale)
-    img = img / 255.0  # Normalize
-    img = np.expand_dims(img, axis=0)  # Add batch dimension
+    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    img = cv2.resize(img, (64, 64))
+    img = img / 255.0  # Normalize pixel values
+    img = np.expand_dims(img, axis=(0, -1))  # Add batch & channel dimension
     return img
 
-
-# **Grad-CAM Function**
-def generate_gradcam(image_path):
-    img_array = preprocess_image(image_path)
-    # Access the last convolutional layer
-    model.summary()
-    # Get the last convolutional layer in the model
-    last_conv_layer = model.get_layer("conv2d_2")   #**Ensure this matches your last conv layer name**
-    print(f"Last convolutional layer: {last_conv_layer.name}")
-    grad_model = tf.keras.models.Model(
-        [model.input], [last_conv_layer.output, model.output]
-    )
-
-    with tf.GradientTape() as tape:
-        conv_outputs, predictions = grad_model(img_array)
-        loss = predictions[:, 0]  # Target class (Pneumonia)
-
-    # Compute gradients
-    grads = tape.gradient(loss, conv_outputs)
-    pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
-    heatmap = tf.reduce_mean(tf.multiply(pooled_grads, conv_outputs), axis=-1)
-
-    # Process heatmap
-    heatmap = np.maximum(heatmap[0], 0)  # Apply ReLU
-    heatmap /= np.max(heatmap)  # Normalize
-
-    # Load original image
-    img = cv2.imread(image_path)
-    img = cv2.resize(img, (64, 64))
-
-    # Apply heatmap
-    heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[0]))
-    heatmap = np.uint8(255 * heatmap)  # Convert to 0-255
-    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)  # Apply colormap
-
-    # Overlay heatmap on original image
-    superimposed_img = cv2.addWeighted(img, 0.6, heatmap, 0.4, 0)
-
-    # Save heatmap
-    heatmap_path = os.path.join("uploads", "heatmap.jpg")
-    cv2.imwrite(heatmap_path, superimposed_img)
-
-    return heatmap_path
-
-# Prediction function
+# Prediction Function
 def predict_pneumonia(image_path):
-    img = preprocess_image(image_path)  # Preprocess the input image
-    prediction = model.predict(img)  # Get model prediction
-    probability = prediction[0][0]  # Extract the probability for 'pneumonia'
+    img = preprocess_image(image_path)
+    probability = model.predict(img)[0][0]
     if probability < 0.30:
         return "Likely Normal", probability
     elif probability < 0.70:
@@ -83,7 +44,55 @@ def predict_pneumonia(image_path):
     else:
         return "High Risk", probability
 
-# **Route for Image Upload & Prediction**
+# New Heatmap Generation Function Using Activation Maps
+def generate_activation_heatmap(image_path, model, layer_name="conv2d_2"):
+    """
+    Generates a heatmap by extracting the activation map from the specified convolutional layer.
+    It averages the channel activations to create a 2D heatmap and overlays it on the original image.
+    """
+    # Preprocess image for prediction
+    img = preprocess_image(image_path)
+
+    # Create a model that outputs activations from the specified layer
+    activation_model = tf.keras.models.Model(
+        inputs=model.inputs,
+        outputs=model.get_layer(layer_name).output
+    )
+
+    # Get the activation map for the input image
+    activations = activation_model.predict(img)
+    # activations shape: (1, h, w, channels)
+    # Average the activations across channels to get a 2D map
+    activation_map = np.mean(activations[0], axis=-1)
+
+    # Normalize the activation map to [0,1]
+    heatmap = np.maximum(activation_map, 0)
+    max_val = np.max(heatmap) if np.max(heatmap) != 0 else 1
+    heatmap /= max_val
+
+    # Load original image for overlay
+    img_orig = cv2.imread(image_path)
+    img_orig = cv2.cvtColor(img_orig, cv2.COLOR_BGR2RGB)
+    # Resize heatmap to match the original image dimensions
+    heatmap = cv2.resize(heatmap, (img_orig.shape[1], img_orig.shape[0]))
+
+    # Convert heatmap to an 8-bit format and apply a colormap
+    heatmap = np.uint8(255 * heatmap)
+    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    # Superimpose the heatmap on the original image
+    superimposed_img = cv2.addWeighted(img_orig, 0.6, heatmap, 0.4, 0)
+
+    # Save the final heatmap image
+    heatmap_path = os.path.join(app.config["HEATMAP_FOLDER"], "output_heatmap.jpg")
+    cv2.imwrite(heatmap_path, superimposed_img)
+    return heatmap_path
+
+# Route to Serve the HTML Page
+@app.route("/")
+def home():
+    return render_template("index.html")  # Serves the upload form
+
+# Route for Image Upload & Prediction
 @app.route("/predict", methods=["POST"])
 def predict():
     if "file" not in request.files:
@@ -93,29 +102,26 @@ def predict():
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
-    filepath = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
+    filepath = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(file.filename))
     file.save(filepath)
 
+    # Get Prediction
     diagnosis, probability = predict_pneumonia(filepath)
-    heatmap_path = generate_gradcam(filepath)  # Generate Grad-CAM
+
+    # Generate Activation Heatmap (using the new method)
+    heatmap_path = generate_activation_heatmap(filepath, model)
 
     return jsonify({
         "diagnosis": diagnosis,
         "pneumonia_probability": round(float(probability), 4),
-        "heatmap_image": heatmap_path
+        "heatmap_url": "/heatmap"  # Endpoint to retrieve the heatmap
     })
 
-# **Route to Serve Heatmap Image**
+# Route to Serve Heatmap
 @app.route("/heatmap")
-def get_heatmap():
-    heatmap_path = os.path.join(app.config["UPLOAD_FOLDER"], "heatmap.jpg")
-    if os.path.exists(heatmap_path):
-        return send_file(heatmap_path, mimetype="image/jpeg")
-    return jsonify({"error": "Heatmap not found"}), 404
-@app.route("/")
-def index():
-    return render_template("index.html")
-if __name__ == "__main__":
-    app.run(debug=True, port=8080)
-# Print model summary to inspect input/output layers
+def serve_heatmap():
+    heatmap_path = os.path.join(app.config["HEATMAP_FOLDER"], "output_heatmap.jpg")
+    return send_file(heatmap_path, mimetype="image/jpeg")
 
+if __name__ == "__main__":
+    app.run(debug=True, port=8008)
