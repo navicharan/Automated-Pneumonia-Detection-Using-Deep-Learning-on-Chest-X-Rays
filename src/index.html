@@ -4,30 +4,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chest X-ray Prediction</title>
+    <title>AI Pneumonia Detection</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script>
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+    </script>
 </head>
 
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-6">
-    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-lg">
-        <h2 class="text-3xl font-bold text-gray-700 mb-6 text-center">Upload Chest X-ray</h2>
+<body class="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:bg-gray-900 text-gray-900 dark:text-gray-200">
+    
+    <!-- Header -->
+    <header class="bg-white shadow-sm dark:bg-gray-800">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <h1 class="text-2xl font-bold">AI Pneumonia Detection</h1>
+            <nav class="flex space-x-4">
+                <a href="#features" class="hover:text-blue-500">Features</a>
+                <a href="#how-it-works" class="hover:text-blue-500">How it Works</a>
+                <a href="#about" class="hover:text-blue-500">About</a>
+            </nav>
+        </div>
+    </header>
 
-        <form id="uploadForm" action="/predict" method="post" enctype="multipart/form-data" class="space-y-4">
-            <label class="block">
-                <input type="file" name="file" accept="image/*" required
-                    class="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </label>
-            <button type="submit"
-                class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 rounded-md transition duration-300">
-                Upload & Predict
-            </button>
-        </form>
+    <!-- Hero Section -->
+    <main class="max-w-7xl mx-auto px-4 py-12">
+        <div class="text-center mb-12">
+            <h2 class="text-4xl font-extrabold">Detect Pneumonia Using AI</h2>
+            <p class="mt-4 text-xl">Upload a chest X-ray image for instant analysis</p>
+        </div>
 
-        <div id="predictionResult" class="hidden mt-6">
-            <h3 class="text-2xl font-bold text-gray-700 mb-4">Prediction Result</h3>
-            <p id="diagnosis" class="text-lg font-medium text-gray-600"></p>
-            <p id="probability" class="text-lg font-medium text-gray-600"></p>
+        <!-- Upload Section -->
+        <div class="max-w-xl mx-auto bg-white rounded-lg shadow-lg p-6 dark:bg-gray-800">
+            <form id="uploadForm" action="/predict" method="post" enctype="multipart/form-data">
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center dark:border-gray-600">
+                    <input type="file" name="file" accept="image/*" required id="fileInput" class="hidden " />
+                    <label for="fileInput" class="block text-gray-600 dark:text-gray-300 cursor-pointer">Upload chest X-ray image</label>
+                    <img id="previewImage" class="hidden w-full mt-4 rounded-md shadow-md" />
+                </div>
+                <button type="submit"
+                    class="w-full mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-md">
+                    Analyze
+                </button>
+            </form>
+        </div>
 
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="hidden text-center mt-6">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p class="mt-2">Analyzing X-ray...</p>
+        </div>
+
+        <!-- Result Section -->
+        <div id="predictionResult" class="hidden mt-8 text-center">
+            <h3 class="text-2xl font-bold">Analysis Results</h3>
+            <p id="diagnosis" class="mt-2"></p>
+            <p id="probability" class="mt-2"></p>
             <div id="imageContainer" class="grid grid-cols-2 gap-4 mt-4">
                 <b>X-ray</b> <br>
                 <img id="xrayImage" src="#" alt="X-ray Image" class="rounded-md shadow-md">
@@ -35,33 +67,49 @@
                 <b>Heatmap</b> <br>
                 <img id="heatmapImage" src="#" alt="Heatmap Image" class="rounded-md shadow-md">
             </div>
+            <p id="errorMessage" class="hidden mt-4 text-red-500"></p>
         </div>
-    </div>
+    </main>
 
     <script>
+        document.getElementById('fileInput').addEventListener('change', function () {
+            const file = this.files[0];
+            if (file) {
+                document.getElementById('previewImage').src = URL.createObjectURL(file);
+                document.getElementById('previewImage').classList.remove('hidden');
+            }
+        });
+
         document.getElementById('uploadForm').addEventListener('submit', async function (event) {
             event.preventDefault();
+            document.getElementById('loadingSpinner').classList.remove('hidden');
+            document.getElementById('predictionResult').classList.add('hidden');
+            document.getElementById('errorMessage').classList.add('hidden');
+
             const formData = new FormData(this);
             try {
                 const response = await fetch('/predict', {
                     method: 'POST',
                     body: formData
                 });
+
+                if (!response.ok) throw new Error('Failed to fetch results');
+
                 const result = await response.json();
-                displayPrediction(result);
+                document.getElementById('diagnosis').textContent = `Diagnosis: ${result.diagnosis}`;
+                document.getElementById('probability').textContent = `Probability: ${result.pneumonia_probability}`;
+                document.getElementById('xrayImage').src = URL.createObjectURL(document.querySelector('input[type=file]').files[0]);
+                document.getElementById('heatmapImage').src = result.heatmap_url;
+
+                document.getElementById('loadingSpinner').classList.add('hidden');
+                document.getElementById('predictionResult').classList.remove('hidden');
             } catch (error) {
-                console.error('Error:', error);
+                document.getElementById('loadingSpinner').classList.add('hidden');
+                document.getElementById('errorMessage').textContent = 'An error occurred while processing the image. Please try again.';
+                document.getElementById('errorMessage').classList.remove('hidden');
             }
         });
-
-        function displayPrediction(data) {
-            document.getElementById('diagnosis').textContent = `Diagnosis: ${data.diagnosis}`;
-            document.getElementById('probability').textContent = `Probability: ${data.pneumonia_probability}`;
-            document.getElementById('xrayImage').src = URL.createObjectURL(document.querySelector('input[type=file]').files[0]);
-            document.getElementById('heatmapImage').src = data.heatmap_url;
-            document.getElementById('predictionResult').classList.remove('hidden');
-        }
     </script>
-</body>
 
+</body>
 </html>
