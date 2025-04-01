@@ -5,7 +5,7 @@ import tensorflow as tf
 import cv2
 from werkzeug.utils import secure_filename
 
-app = Flask(__name__, template_folder="templates")  # Ensure Flask looks for templates
+app = Flask(__name__, template_folder="src")  # Ensure Flask looks for templates
 
 UPLOAD_FOLDER = "uploads"
 HEATMAP_FOLDER = "heatmaps"
@@ -124,4 +124,4 @@ def serve_heatmap():
     return send_file(heatmap_path, mimetype="image/jpeg")
 
 if __name__ == "__main__":
-    app.run(debug=True, port=8008)
+    app.run(debug=True, port=8080)
