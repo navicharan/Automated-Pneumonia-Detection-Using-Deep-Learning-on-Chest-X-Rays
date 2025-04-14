@@ -5,6 +5,7 @@ import tensorflow as tf
 import cv2
 from werkzeug.utils import secure_filename
 import requests
+from dotenv import load_dotenv
 
 app = Flask(__name__, template_folder="src")  # Ensure Flask looks for templates
 
@@ -15,6 +16,14 @@ os.makedirs(HEATMAP_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["HEATMAP_FOLDER"] = HEATMAP_FOLDER
+
+# Load environment variables
+load_dotenv()
+
+# Get API key from environment variable
+API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
+if not API_KEY:
+    raise ValueError("GOOGLE_MAPS_API_KEY not found in environment variables")
 
 # Load trained model from best_model.h5
 # Note: Instead of a string, load the actual model.
@@ -149,7 +158,7 @@ def get_nearby_hospitals():
         "radius": "5000",  # 5km radius
         "type": "hospital",
         "keyword": "hospital",
-        "key": ""  # Your API key
+        "key": API_KEY  # Now using environment variable
     }
 
     try:
