@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 import cv2
 from werkzeug.utils import secure_filename
+import requests
 
 app = Flask(__name__, template_folder="src")  # Ensure Flask looks for templates
 
@@ -130,6 +131,39 @@ def serve_heatmap():
 def serve_img(filename):
     img_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     return send_file(img_path, mimetype="image/jpeg")
+
+# Add this new route
+@app.route("/nearby-hospitals")
+def get_nearby_hospitals():
+    # Get latitude and longitude from request parameters
+    lat = request.args.get('lat')
+    lng = request.args.get('lng')
+    
+    if not lat or not lng:
+        return jsonify({"error": "Location parameters required"}), 400
+
+    # Google Places API configuration
+    url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+    params = {
+        "location": f"{lat},{lng}",
+        "radius": "5000",  # 5km radius
+        "type": "hospital",
+        "keyword": "hospital",
+        "key": "AIzaSyCd-bCVi9zFmZfmbwVm-tVEDaeW4DaS8fw"  # Your API key
+    }
+
+    try:
+        # Make request to Google Places API
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        
+        # Log the response for debugging
+        print("Google Places API response:", response.json())
+        
+        return jsonify(response.json())
+    except Exception as e:
+        print(f"Error fetching hospitals: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, port=8080)
