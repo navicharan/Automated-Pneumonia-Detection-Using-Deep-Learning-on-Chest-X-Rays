@@ -1,4 +1,6 @@
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask, request, jsonify, render_template, send_file, redirect, url_for, session
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests  # Rename to avoid conflict
 import os
 import numpy as np
 import tensorflow as tf
@@ -6,6 +8,10 @@ import cv2
 from werkzeug.utils import secure_filename
 import requests
 from dotenv import load_dotenv
+from functools import wraps
+from werkzeug.security import check_password_hash, generate_password_hash
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
 
 app = Flask(__name__, template_folder="src")  # Ensure Flask looks for templates
 
@@ -16,6 +22,25 @@ os.makedirs(HEATMAP_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["HEATMAP_FOLDER"] = HEATMAP_FOLDER
+
+# Add these configurations
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key')
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
+
+# Add after Flask app initialization
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<User {self.email}>'
 
 # Load environment variables
 load_dotenv()
@@ -97,13 +122,27 @@ def generate_activation_heatmap(image_path, model, layer_name="conv2d_2"):
     cv2.imwrite(heatmap_path, superimposed_img)
     return heatmap_path
 
+# Login required decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            return redirect(url_for('login_page'))  # Update this to use login_page
+        return f(*args, **kwargs)
+    return decorated_function
+
 # Route to Serve the HTML Page
 @app.route("/")
-def home():
-    return render_template("index.html")  # Serves the upload form
+@login_required
+def index():
+    user = session.get('user')
+    if not user:
+        return redirect(url_for('login_page'))
+    return render_template("index.html", user=user)
 
 # Route for Image Upload & Prediction
 @app.route("/predict", methods=["POST"])
+@login_required
 def predict():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
@@ -174,5 +213,120 @@ def get_nearby_hospitals():
         print(f"Error fetching hospitals: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+# Add these new routes
+@app.route('/login')
+def login_page():  # Changed from 'login' to 'login_page'
+    if 'user' in session:
+        return redirect(url_for('index'))
+    return render_template('login.html')
+
+@app.route('/auth/google', methods=['POST'])
+def google_auth():
+    try:
+        token = request.json['credential']
+        
+        # Verify the token using the correct Request object
+        idinfo = id_token.verify_oauth2_token(
+            token, 
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID
+        )
+
+        # Get user info
+        user_info = {
+            'email': idinfo['email'],
+            'name': idinfo['name'],
+            'picture': idinfo['picture']
+        }
+        
+        # Store in session
+        session['user'] = user_info
+        
+        return jsonify({'success': True})
+    except ValueError as e:
+        print(f"Token validation error: {e}")
+        return jsonify({'success': False, 'error': 'Invalid token'}), 401
+
+@app.route('/auth/email', methods=['POST'])
+def email_auth():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
+        remember = data.get('remember', False)
+
+        # Check against test credentials
+        if email == TEST_USER['email'] and password == TEST_USER['password']:
+            session.permanent = remember
+            session['user'] = {
+                'email': TEST_USER['email'],
+                'name': TEST_USER['name'],
+                'picture': TEST_USER['picture']
+            }
+            return jsonify({'success': True})
+        else:
+            return jsonify({
+                'success': False, 
+                'error': 'Please use admin@test.com / admin123'
+            }), 401
+
+    except Exception as e:
+        print(f"Login error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect(url_for('login_page'))  # Update this to use login_page
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'GET':
+        return render_template('signup.html')
+    
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
+        name = data.get('name')
+
+        # Check if user already exists
+        if User.query.filter_by(email=email).first():
+            return jsonify({
+                'success': False,
+                'error': 'Email already registered'
+            }), 400
+
+        # Create new user
+        hashed_password = generate_password_hash(password)
+        new_user = User(
+            email=email,
+            password_hash=hashed_password,
+            name=name
+        )
+        
+        db.session.add(new_user)
+        db.session.commit()
+
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Signup error: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Registration failed'
+        }), 500
+
+# Add after your imports
+TEST_USER = {
+    'email': 'admin@test.com',
+    'password': 'admin@123',
+    'name': 'Admin User',
+    'picture': 'https://ui-avatars.com/api/?name=Admin+User'
+}
+
+# Add after all your routes
+with app.app_context():
+    db.create_all()
+
 if __name__ == "__main__":
-    app.run(debug=True, port=8080)
+    app.run(debug=True, port=5000)
