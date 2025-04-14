@@ -258,12 +258,14 @@
     <script>
         document.getElementById('fileInput').addEventListener('change', function () {
             const file = this.files[0];
+            
             if (file) {
                 document.getElementById('previewImage').src = URL.createObjectURL(file);
                 document.getElementById('previewImage').classList.remove('hidden');
             }
         });
 
+        // Update the form submission handler
         document.getElementById('uploadForm').addEventListener('submit', async function (event) {
             event.preventDefault();
             document.getElementById('loadingSpinner').classList.remove('hidden');
@@ -280,29 +282,30 @@
                 if (!response.ok) throw new Error('Failed to fetch results');
 
                 const result = await response.json();
+                const timestamp = new Date().getTime(); // Add timestamp for cache busting
 
-                // document.getElementById('diagnosis').textContent = `Diagnosis: ${result.diagnosis}`;
+                // Update diagnosis and probability
                 const diagnosisEl = document.getElementById('diagnosis');
                 const showHospitalsBtn = document.getElementById('showHospitalsBtn');
                 diagnosisEl.textContent = `Diagnosis: ${result.diagnosis}`;
 
-                // Reset all previous styles
+                // Reset styles and update diagnosis display
                 diagnosisEl.classList.remove('text-red-600', 'text-green-600', 'text-yellow-500');
-
-                // Add color based on risk level and show/hide hospital button
+                
                 const diagnosis = result.diagnosis.toLowerCase();
                 if (diagnosis.includes('high risk')) {
                     diagnosisEl.classList.add('text-red-600');
-                    showHospitalsBtn.classList.remove('hidden'); // Show button only for high risk
+                    showHospitalsBtn.classList.remove('hidden');
                 } else {
                     diagnosisEl.classList.add(diagnosis.includes('moderate risk') ? 'text-yellow-500' : 'text-green-600');
-                    showHospitalsBtn.classList.add('hidden'); // Hide button for other cases
+                    showHospitalsBtn.classList.add('hidden');
                 }
 
-
                 document.getElementById('probability').textContent = `Probability: ${result.pneumonia_probability}`;
-                document.getElementById('xrayImage').src = result.xray_url;
-                document.getElementById('heatmapImage').src = result.heatmap_url;
+                
+                // Add timestamp to URLs to prevent caching
+                document.getElementById('xrayImage').src = `${result.xray_url}?t=${timestamp}`;
+                document.getElementById('heatmapImage').src = `${result.heatmap_url}?t=${timestamp}`;
 
                 document.getElementById('loadingSpinner').classList.add('hidden');
                 document.getElementById('predictionResult').classList.remove('hidden');

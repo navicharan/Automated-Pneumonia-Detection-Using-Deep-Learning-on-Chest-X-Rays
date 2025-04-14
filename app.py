@@ -149,7 +149,7 @@ def get_nearby_hospitals():
         "radius": "5000",  # 5km radius
         "type": "hospital",
         "keyword": "hospital",
-        "key": ""  # Your API key
+        "key": "AIzaSyCd-bCVi9zFmZfmbwVm-tVEDaeW4DaS8fw"  # Your API key
     }
 
     try:
