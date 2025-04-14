@@ -10,7 +10,6 @@ import requests
 from dotenv import load_dotenv
 from functools import wraps
 from werkzeug.security import check_password_hash, generate_password_hash
-from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
 app = Flask(__name__, template_folder="src")  # Ensure Flask looks for templates
@@ -26,21 +25,6 @@ app.config["HEATMAP_FOLDER"] = HEATMAP_FOLDER
 # Add these configurations
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key')
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
-
-# Add after Flask app initialization
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
-
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(200), nullable=False)
-    name = db.Column(db.String(100), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def __repr__(self):
-        return f'<User {self.email}>'
 
 # Load environment variables
 load_dotenv()
@@ -255,20 +239,30 @@ def email_auth():
         password = data.get('password')
         remember = data.get('remember', False)
 
-        # Check against test credentials
-        if email == TEST_USER['email'] and password == TEST_USER['password']:
-            session.permanent = remember
-            session['user'] = {
-                'email': TEST_USER['email'],
-                'name': TEST_USER['name'],
-                'picture': TEST_USER['picture']
-            }
-            return jsonify({'success': True})
-        else:
+        # Basic validation
+        if not email or not password:
             return jsonify({
-                'success': False, 
-                'error': 'Please use admin@test.com / admin123'
+                'success': False,
+                'error': 'Email and password are required'
+            }), 400
+
+        # Basic password validation (at least 6 characters)
+        if len(password) < 6:
+            return jsonify({
+                'success': False,
+                'error': 'Password must be at least 6 characters long'
             }), 401
+
+        # If validation passes, create session
+        name = email.split('@')[0].title()
+        
+        session.permanent = remember
+        session['user'] = {
+            'email': email,
+            'name': name,
+            'picture': f'https://ui-avatars.com/api/?name={name.replace(" ", "+")}'
+        }
+        return jsonify({'success': True})
 
     except Exception as e:
         print(f"Login error: {e}")
@@ -278,55 +272,6 @@ def email_auth():
 def logout():
     session.pop('user', None)
     return redirect(url_for('login_page'))  # Update this to use login_page
-
-@app.route('/signup', methods=['GET', 'POST'])
-def signup():
-    if request.method == 'GET':
-        return render_template('signup.html')
-    
-    try:
-        data = request.get_json()
-        email = data.get('email')
-        password = data.get('password')
-        name = data.get('name')
-
-        # Check if user already exists
-        if User.query.filter_by(email=email).first():
-            return jsonify({
-                'success': False,
-                'error': 'Email already registered'
-            }), 400
-
-        # Create new user
-        hashed_password = generate_password_hash(password)
-        new_user = User(
-            email=email,
-            password_hash=hashed_password,
-            name=name
-        )
-        
-        db.session.add(new_user)
-        db.session.commit()
-
-        return jsonify({'success': True})
-    except Exception as e:
-        print(f"Signup error: {e}")
-        return jsonify({
-            'success': False,
-            'error': 'Registration failed'
-        }), 500
-
-# Add after your imports
-TEST_USER = {
-    'email': 'admin@test.com',
-    'password': 'admin@123',
-    'name': 'Admin User',
-    'picture': 'https://ui-avatars.com/api/?name=Admin+User'
-}
-
-# Add after all your routes
-with app.app_context():
-    db.create_all()
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
