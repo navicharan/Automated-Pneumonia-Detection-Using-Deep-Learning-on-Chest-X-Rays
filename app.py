@@ -102,7 +102,8 @@ def predict():
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
-    filepath = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(file.filename))
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(filepath)
 
     # Get Prediction
@@ -110,11 +111,12 @@ def predict():
 
     # Generate Activation Heatmap (using the new method)
     heatmap_path = generate_activation_heatmap(filepath, model)
-
+    
     return jsonify({
         "diagnosis": diagnosis,
         "pneumonia_probability": round(float(probability), 4),
-        "heatmap_url": "/heatmap"  # Endpoint to retrieve the heatmap
+        "heatmap_url": "/heatmap",  # Fixed missing comma
+        "xray_url": f"/img/{filename}"  # Added filename parameter
     })
 
 # Route to Serve Heatmap
@@ -122,6 +124,12 @@ def predict():
 def serve_heatmap():
     heatmap_path = os.path.join(app.config["HEATMAP_FOLDER"], "output_heatmap.jpg")
     return send_file(heatmap_path, mimetype="image/jpeg")
+
+# Fixed route to serve original image
+@app.route("/img/<filename>")
+def serve_img(filename):
+    img_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+    return send_file(img_path, mimetype="image/jpeg")
 
 if __name__ == "__main__":
     app.run(debug=True, port=8080)

@@ -13,63 +13,217 @@
     </script>
 </head>
 
-<body class="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:bg-gray-900 text-gray-900 dark:text-gray-200">
-    
-    <!-- Header -->
-    <header class="bg-white shadow-sm dark:bg-gray-800">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-            <h1 class="text-2xl font-bold">AI Pneumonia Detection</h1>
-            <nav class="flex space-x-4">
-                <a href="#features" class="hover:text-blue-500">Features</a>
-                <a href="#how-it-works" class="hover:text-blue-500">How it Works</a>
-                <a href="#about" class="hover:text-blue-500">About</a>
-            </nav>
-        </div>
-    </header>
+<body class="bg-white text-gray-900">
 
     <!-- Hero Section -->
-    <main class="max-w-7xl mx-auto px-4 py-12">
-        <div class="text-center mb-12">
-            <h2 class="text-4xl font-extrabold">Detect Pneumonia Using AI</h2>
-            <p class="mt-4 text-xl">Upload a chest X-ray image for instant analysis</p>
-        </div>
-
-        <!-- Upload Section -->
-        <div class="max-w-xl mx-auto bg-white rounded-lg shadow-lg p-6 dark:bg-gray-800">
-            <form id="uploadForm" action="/predict" method="post" enctype="multipart/form-data">
-                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center dark:border-gray-600">
-                    <input type="file" name="file" accept="image/*" required id="fileInput" class="hidden " />
-                    <label for="fileInput" class="block text-gray-600 dark:text-gray-300 cursor-pointer">Upload chest X-ray image</label>
-                    <img id="previewImage" class="hidden w-full mt-4 rounded-md shadow-md" />
+    <section class="bg-gradient-to-r from-blue-100 to-white py-16 px-4">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center">
+            <div class="md:w-1/2 mb-10 md:mb-0 md:pr-10">
+                <h1 class="text-4xl sm:text-5xl font-bold leading-tight mb-4">
+                    AI-Powered <span class="text-blue-600">Pneumonia</span> Detection
+                </h1>
+                <p class="text-lg mb-6">
+                    Upload a chest X-ray image and get instant analysis using our advanced deep learning algorithm.
+                </p>
+                <div class="flex flex-wrap gap-4">
+                    <a href="#upload"
+                        class="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium shadow-md hover:shadow-lg">Try It
+                        Now</a>
+                    <a href="#about"
+                        class="border border-blue-600 text-blue-600 px-6 py-3 rounded-lg font-medium hover:bg-blue-100">Learn
+                        More</a>
                 </div>
-                <button type="submit"
-                    class="w-full mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-md">
-                    Analyze
-                </button>
-            </form>
+            </div>
+            <div class="md:w-1/2 flex justify-center">
+                <div class="relative">
+                    <div class="absolute -z-10 w-64 h-64 bg-teal-400 rounded-full blur-3xl opacity-20 animate-pulse">
+                    </div>
+                    <div class="w-64 h-64 text-blue-600"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                            stroke-linejoin="round" class="w-64 h-64 text-blue-600">
+                            <path
+                                d="M6.081 20c-2.469 0-4.5-2.01-4.5-4.476 0-1.136.28-1.897 1.5-3 .555-.505 1.5-2.5 1.5-5.5 0-2.307 1.5-2.973 3-3 1.494-.027 3 .675 3 3.5v10.12c0 2.686 0 5.452-4.5 2.356z" />
+                            <path
+                                d="M17.919 20c2.469 0 4.5-2.01 4.5-4.476 0-1.136-.28-1.897-1.5-3-.555-.505-1.5-2.5-1.5-5.5 0-2.307-1.5-2.973-3-3-1.494-.027-3 .675-3 3.5v10.12c0 2.686 0 5.452 4.5 2.356z" />
+                            <path d="M12 4v7" />
+                            <path d="M9 9h6" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
         </div>
+    </section>
 
-        <!-- Loading Spinner -->
-        <div id="loadingSpinner" class="hidden text-center mt-6">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p class="mt-2">Analyzing X-ray...</p>
+    <!-- Upload Section -->
+    <section id="upload" class="py-16 px-4 bg-gray-50">
+        <div class="max-w-4xl mx-auto">
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-bold mb-4">Upload Chest X-ray Image</h2>
+                <p class="text-lg">
+                    Upload a clear, frontal chest X-ray image for analysis.
+                </p>
+            </div>
+            <div class="bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <div class="mb-4 p-4 rounded-full bg-blue-100 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-blue-600" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                </div>
+
+                <form id="uploadForm" action="/predict" method="post" enctype="multipart/form-data">
+                    <input type="file" name="file" accept="image/*" required id="fileInput" class="hidden" />
+                    <label for="fileInput" class="text-blue-600 cursor-pointer font-medium">Browse files</label>
+                    <div class="mt-4">
+                        <img id="previewImage" class="hidden w-full mt-4 rounded-md shadow-md" />
+                    </div>
+                    <p class="text-sm text-gray-500 mt-2">Supported formats: PNG, JPG, JPEG (Max size: 5MB)</p>
+                    <div class="flex justify-center mt-6">
+                        <button type="submit"
+                            class="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700">
+                            Analyze X-ray
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
+    </section>
 
-        <!-- Result Section -->
-        <div id="predictionResult" class="hidden mt-8 text-center">
-            <h3 class="text-2xl font-bold">Analysis Results</h3>
-            <p id="diagnosis" class="mt-2"></p>
-            <p id="probability" class="mt-2"></p>
-            <div id="imageContainer" class="grid grid-cols-2 gap-4 mt-4">
-                <b>X-ray</b> <br>
-                <img id="xrayImage" src="#" alt="X-ray Image" class="rounded-md shadow-md">
-                <br>
-                <b>Heatmap</b> <br>
-                <img id="heatmapImage" src="#" alt="Heatmap Image" class="rounded-md shadow-md">
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="hidden text-center mt-6">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        <p class="mt-2">Analyzing X-ray...</p>
+    </div>
+
+    <!-- Result Section -->
+    <div id="predictionResult" class="hidden mt-8 px-4 max-w-4xl mx-auto">
+        <h3 class="text-2xl font-bold text-center mb-4">Analysis Results</h3>
+        <div class="bg-white rounded-lg shadow-md p-6 text-center">
+            <p id="diagnosis" class="text-4xl font-bold text-black-600 animate-pulse"></p>
+            <p id="probability" class="text-xl font-semibold text-gray-800 mt-3"></p>
+
+            <div id="imageContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                    <b>X-ray</b>
+                    <img id="xrayImage" src="#" alt="X-ray Image" class="rounded-md shadow-md mt-2">
+                </div>
+                <div>
+                    <b>Heatmap</b>
+                    <img id="heatmapImage" src="#" alt="Heatmap Image" class="rounded-md shadow-md mt-2">
+                </div>
             </div>
             <p id="errorMessage" class="hidden mt-4 text-red-500"></p>
         </div>
-    </main>
+    </div>
+    <!-- About Section -->
+    <section id="about" class="py-16 px-4 bg-blue-100/30">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold mb-4">About the Technology</h2>
+                <p class="text-lg max-w-3xl mx-auto">
+                    Our AI-powered pneumonia detection system uses state-of-the-art deep learning to analyze chest
+                    X-rays with high accuracy, supporting healthcare professionals in diagnosis.
+                </p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                <div class="p-6 shadow-md bg-white rounded-lg">
+                    <div class="mb-4 p-3 rounded-full bg-blue-100 w-fit">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                            class="w-8 h-8 text-blue-500">
+                            <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                            <rect x="9" y="9" width="6" height="6" />
+                            <path d="M9 1v2M15 1v2M9 21v2M15 21v2M1 9h2M1 15h2M21 9h2M21 15h2" />
+                        </svg>
+
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Deep Learning Model</h3>
+                    <p>Our system uses a CNN trained on medical datasets to identify pneumonia patterns.</p>
+                </div>
+                <div class="p-6 shadow-md bg-white rounded-lg">
+                    <div class="mb-4 p-3 rounded-full bg-blue-100 w-fit">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                            class="w-8 h-8 text-yellow-500">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 13 10 13 2" />
+                        </svg>
+
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Real-time Analysis</h3>
+                    <p>Get instant results with our advanced pipeline that analyzes X-rays in seconds.</p>
+                </div>
+                <div class="p-6 shadow-md bg-white rounded-lg">
+                    <div class="mb-4 p-3 rounded-full bg-blue-100 w-fit">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                            class="w-8 h-8 text-green-500">
+                            <path d="M17 17v5l-5-3-5 3v-5" />
+                            <circle cx="12" cy="11" r="4" />
+                            <path d="M19.5 10.5a7 7 0 1 0-15 0 7 7 0 0 0 15 0z" />
+                        </svg>
+
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Evidence-based Recommendations</h3>
+                    <p>Receive medical recommendations based on detection probability.</p>
+                </div>
+                <div class="p-6 shadow-md bg-white rounded-lg">
+                    <div class="mb-4 p-3 rounded-full bg-blue-100 w-fit"><svg xmlns="http://www.w3.org/2000/svg"
+                            fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+                            stroke-linecap="round" stroke-linejoin="round" class="w-8 h-8 text-purple-500">
+                            <circle cx="6" cy="6" r="3" />
+                            <circle cx="6" cy="18" r="3" />
+                            <circle cx="18" cy="6" r="3" />
+                            <path d="M6 9v6a9 9 0 0 0 9 9" />
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Visual Explanations</h3>
+                    <p>See highlighted areas in X-rays for better transparency in decision-making.</p>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-lg p-8 md:p-10">
+                <h3 class="text-2xl font-bold mb-6">How It Works</h3>
+                <div class="space-y-6">
+                    <div class="flex items-start gap-6">
+                        <div
+                            class="w-12 h-12 flex items-center justify-center bg-blue-600 text-white font-bold rounded-full">
+                            1</div>
+                        <div>
+                            <h4 class="text-xl font-semibold mb-2">Image Upload</h4>
+                            <p>Upload a chest X-ray image through our secure interface.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-6">
+                        <div
+                            class="w-12 h-12 flex items-center justify-center bg-blue-600 text-white font-bold rounded-full">
+                            2</div>
+                        <div>
+                            <h4 class="text-xl font-semibold mb-2">AI Processing</h4>
+                            <p>Our CNN analyzes patterns and features indicative of pneumonia.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-6">
+                        <div
+                            class="w-12 h-12 flex items-center justify-center bg-blue-600 text-white font-bold rounded-full">
+                            3</div>
+                        <div>
+                            <h4 class="text-xl font-semibold mb-2">Result Generation</h4>
+                            <p>Produces probability score and visual explanations for transparency.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-6">
+                        <div
+                            class="w-12 h-12 flex items-center justify-center bg-blue-600 text-white font-bold rounded-full">
+                            4</div>
+                        <div>
+                            <h4 class="text-xl font-semibold mb-2">Clinical Decision Support</h4>
+                            <p>System provides risk assessment and treatment recommendations.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <script>
         document.getElementById('fileInput').addEventListener('change', function () {
@@ -96,9 +250,28 @@
                 if (!response.ok) throw new Error('Failed to fetch results');
 
                 const result = await response.json();
-                document.getElementById('diagnosis').textContent = `Diagnosis: ${result.diagnosis}`;
+
+                // document.getElementById('diagnosis').textContent = `Diagnosis: ${result.diagnosis}`;
+                const diagnosisEl = document.getElementById('diagnosis');
+                diagnosisEl.textContent = `Diagnosis: ${result.diagnosis}`;
+
+                // Reset all previous styles
+                diagnosisEl.classList.remove('text-red-600', 'text-green-600', 'text-yellow-500');
+
+                // Add color based on risk level
+                const diagnosis = result.diagnosis.toLowerCase();
+
+                if (diagnosis.includes('high risk')) {
+                    diagnosisEl.classList.add('text-red-600');
+                } else if (diagnosis.includes('moderate risk')) {
+                    diagnosisEl.classList.add('text-yellow-500');
+                } else if (diagnosis.includes('likely normal')) {
+                    diagnosisEl.classList.add('text-green-600');
+                }
+
+
                 document.getElementById('probability').textContent = `Probability: ${result.pneumonia_probability}`;
-                document.getElementById('xrayImage').src = URL.createObjectURL(document.querySelector('input[type=file]').files[0]);
+                document.getElementById('xrayImage').src = result.xray_url;
                 document.getElementById('heatmapImage').src = result.heatmap_url;
 
                 document.getElementById('loadingSpinner').classList.add('hidden');
@@ -112,4 +285,5 @@
     </script>
 
 </body>
+
 </html>
