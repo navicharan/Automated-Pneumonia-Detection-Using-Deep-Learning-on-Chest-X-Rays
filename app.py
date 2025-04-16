@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from functools import wraps
 from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import datetime
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__, template_folder="src")  # Ensure Flask looks for templates
 
@@ -239,39 +240,86 @@ def email_auth():
         password = data.get('password')
         remember = data.get('remember', False)
 
-        # Basic validation
-        if not email or not password:
-            return jsonify({
-                'success': False,
-                'error': 'Email and password are required'
-            }), 400
-
-        # Basic password validation (at least 6 characters)
-        if len(password) < 6:
-            return jsonify({
-                'success': False,
-                'error': 'Password must be at least 6 characters long'
-            }), 401
-
-        # If validation passes, create session
-        name = email.split('@')[0].title()
+        # Find user
+        user = User.query.filter_by(email=email).first()
         
-        session.permanent = remember
-        session['user'] = {
-            'email': email,
-            'name': name,
-            'picture': f'https://ui-avatars.com/api/?name={name.replace(" ", "+")}'
-        }
-        return jsonify({'success': True})
+        if user and check_password_hash(user.password_hash, password):
+            session.permanent = remember
+            session['user'] = {
+                'email': user.email,
+                'name': user.name,
+                'picture': f'https://ui-avatars.com/api/?name={user.name.replace(" ", "+")}'
+            }
+            return jsonify({'success': True})
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid email or password'
+            }), 401
 
     except Exception as e:
         print(f"Login error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/signup', methods=['POST'])
+def signup():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
+        name = data.get('name')
+
+        # Validate input
+        if not all([email, password, name]):
+            return jsonify({
+                'success': False,
+                'error': 'All fields are required'
+            }), 400
+
+        # Check if user already exists
+        if User.query.filter_by(email=email).first():
+            return jsonify({
+                'success': False,
+                'error': 'Email already registered'
+            }), 400
+
+        # Create new user
+        password_hash = generate_password_hash(password)
+        new_user = User(email=email, password_hash=password_hash, name=name)
+        db.session.add(new_user)
+        db.session.commit()
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        print(f"Signup error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/signup', methods=['GET'])
+def signup_page():
+    if 'user' in session:
+        return redirect(url_for('index'))
+    return render_template('signup.html')
+
 @app.route('/logout')
 def logout():
     session.pop('user', None)
     return redirect(url_for('login_page'))  # Update this to use login_page
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Initialize database
+with app.app_context():
+    db.create_all()
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
