@@ -176,6 +176,40 @@
             <p id="errorMessage" class="hidden mt-4 text-red-500"></p>
         </div>
     </div>
+    <div id="analysisResult" class="mt-6 p-4 bg-white rounded-lg shadow">
+        <h4 class="text-xl font-semibold mb-3">Detailed Analysis</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-2">
+                <h5 class="font-medium">Affected Regions:</h5>
+                <div id="affectedRegions" class="text-sm space-y-1">
+                    <!-- Regions will be populated here -->
+                </div>
+            </div>
+            <div>
+                <h5 class="font-medium mb-2">Heatmap Interpretation:</h5>
+                <div class="text-sm">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                        <span>High activation (severe involvement)</span>
+                    </div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-3 h-3 rounded-full bg-yellow-500"></span>
+                        <span>Moderate activation (moderate involvement)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+                        <span>Low activation (minimal/no involvement)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 p-3 bg-gray-50 rounded">
+            <h5 class="font-medium mb-2">Clinical Interpretation:</h5>
+            <p id="clinicalAnalysis" class="text-sm">
+                <!-- Analysis text will be populated here -->
+            </p>
+        </div>
+    </div>
     <button id="showHospitalsBtn" class="bg-blue-500 text-white px-4 py-2 rounded mx-auto block mt-6 hidden">
         Show Nearby Hospitals
     </button>
@@ -347,12 +381,72 @@
 
                 document.getElementById('loadingSpinner').classList.add('hidden');
                 document.getElementById('predictionResult').classList.remove('hidden');
+
+                // Update affected regions
+                const affectedRegionsDiv = document.getElementById('affectedRegions');
+                if (result.affected_regions && result.affected_regions.length > 0) {
+                    affectedRegionsDiv.innerHTML = result.affected_regions.map(region => `
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full ${getSeverityColor(region.severity)}"></span>
+                            <span>${region.name}: ${region.severity} severity</span>
+                        </div>
+                    `).join('');
+                } else {
+                    affectedRegionsDiv.innerHTML = '<p>No significant abnormalities detected</p>';
+                }
+
+                // Update clinical interpretation
+                const clinicalAnalysis = document.getElementById('clinicalAnalysis');
+                clinicalAnalysis.innerHTML = generateClinicalInterpretation(result);
+
             } catch (error) {
                 document.getElementById('loadingSpinner').classList.add('hidden');
                 document.getElementById('errorMessage').textContent = 'An error occurred while processing the image. Please try again.';
                 document.getElementById('errorMessage').classList.remove('hidden');
             }
         });
+
+        // Helper function to get severity color
+        function getSeverityColor(severity) {
+            switch(severity.toLowerCase()) {
+                case 'high':
+                    return 'bg-red-500';
+                case 'moderate':
+                    return 'bg-yellow-500';
+                default:
+                    return 'bg-blue-500';
+            }
+        }
+
+        // Helper function to generate clinical interpretation
+        function generateClinicalInterpretation(result) {
+            const probability = parseFloat(result.pneumonia_probability);
+            const affectedCount = result.affected_regions ? result.affected_regions.length : 0;
+            
+            let interpretation = '';
+            
+            if (probability > 0.7) {
+                interpretation = `
+                    <p class="mb-2">High probability of pneumonia detected (${(probability * 100).toFixed(1)}%).</p>
+                    <p class="mb-2">Findings indicate significant involvement in ${affectedCount} lung region(s).</p>
+                    <p class="font-medium text-red-600">Recommendation: Immediate medical consultation advised.</p>
+                `;
+            } else if (probability > 0.3) {
+                interpretation = `
+                    <p class="mb-2">Moderate probability of pneumonia detected (${(probability * 100).toFixed(1)}%).</p>
+                    <p class="mb-2">Some abnormalities noted in ${affectedCount} lung region(s).</p>
+                    <p class="font-medium text-yellow-600">Recommendation: Follow-up with healthcare provider recommended.</p>
+                `;
+            } else {
+                interpretation = `
+                    <p class="mb-2">Low probability of pneumonia (${(probability * 100).toFixed(1)}%).</p>
+                    <p class="mb-2">No significant abnormalities detected.</p>
+                    <p class="font-medium text-green-600">Recommendation: Monitor for any changes in symptoms.</p>
+                `;
+            }
+
+            return interpretation;
+        }
     </script>
     <script>
 async function searchNearbyHospitals() {

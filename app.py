@@ -57,18 +57,89 @@ def preprocess_image(image_path):
 def predict_pneumonia(image_path):
     img = preprocess_image(image_path)
     probability = model.predict(img)[0][0]
+    
+    # Generate heatmap and get affected regions first
+    heatmap_result = generate_activation_heatmap(image_path, model)
+    affected_regions = heatmap_result["affected_regions"]
+    
+    # Classify risk and provide relevant regions
     if probability < 0.30:
-        return "Likely Normal", probability
+        return "Likely Normal", probability, []
     elif probability < 0.70:
-        return "Moderate Risk", probability
+        # For moderate risk, show regions with moderate or high severity
+        relevant_regions = [
+            region for region in affected_regions 
+            if region['severity'] in ['Moderate', 'High']
+        ]
+        return "Moderate Risk", probability, relevant_regions
     else:
-        return "High Risk", probability
+        # For high risk, show all affected regions
+        return "High Risk", probability, affected_regions
 
-# New Heatmap Generation Function Using Activation Maps
+def analyze_affected_regions(heatmap, threshold=0.5):
+    """
+    Analyzes the heatmap with anatomically specific regions and refined thresholding
+    """
+    # Define anatomically specific lung regions
+    lung_regions = {
+        'Right Upper (Apical)': ((0, 15), (0, 32)),
+        'Right Middle (Cardiac)': ((15, 35), (0, 32)), 
+        'Right Lower (Basal)': ((35, 64), (0, 32)),
+        'Left Upper (Apical)': ((0, 15), (32, 64)),
+        'Left Middle (Hilar)': ((15, 35), (32, 64)),
+        'Left Lower (Basal)': ((35, 64), (32, 64))
+    }
+    
+    # Calculate regional statistics for adaptive thresholding
+    global_mean = np.mean(heatmap)
+    global_std = np.std(heatmap)
+    
+    # Refined thresholds with anatomical considerations
+    thresholds = {
+        'high': global_mean + (global_std * 1.5),  # More stringent high threshold
+        'moderate': global_mean + (global_std * 0.75),
+        'low': global_mean + (global_std * 0.25)
+    }
+    
+    affected_regions = []
+    for region_name, ((y1, y2), (x1, x2)) in lung_regions.items():
+        region_heatmap = heatmap[y1:y2, x1:x2]
+        
+        # Calculate regional metrics
+        activation_mean = np.mean(region_heatmap)
+        activation_max = np.max(region_heatmap)
+        activation_area = np.sum(region_heatmap > thresholds['low']) / region_heatmap.size
+        
+        # Determine severity based on multiple factors
+        if activation_max > thresholds['high'] and activation_area > 0.3:
+            severity = "High"
+            confidence = min(activation_area * 1.5, 1.0)
+        elif activation_mean > thresholds['moderate'] or activation_area > 0.2:
+            severity = "Moderate"
+            confidence = activation_area
+        elif activation_mean > thresholds['low']:
+            severity = "Low"
+            confidence = activation_area * 0.5
+        else:
+            continue  # Skip regions with minimal activation
+        
+        affected_regions.append({
+            "name": region_name,
+            "severity": severity,
+            "score": float(confidence),
+            "area_affected": float(activation_area),
+            "max_intensity": float(activation_max)
+        })
+    
+    # Sort by severity and then by score
+    severity_order = {"High": 3, "Moderate": 2, "Low": 1}
+    affected_regions.sort(key=lambda x: (severity_order[x['severity']], x['score']), reverse=True)
+    
+    return affected_regions
+
 def generate_activation_heatmap(image_path, model, layer_name="conv2d_2"):
     """
-    Generates a heatmap by extracting the activation map from the specified convolutional layer.
-    It averages the channel activations to create a 2D heatmap and overlays it on the original image.
+    Generates and analyzes heatmap showing affected lung regions
     """
     # Preprocess image for prediction
     img = preprocess_image(image_path)
@@ -105,7 +176,70 @@ def generate_activation_heatmap(image_path, model, layer_name="conv2d_2"):
     # Save the final heatmap image
     heatmap_path = os.path.join(app.config["HEATMAP_FOLDER"], "output_heatmap.jpg")
     cv2.imwrite(heatmap_path, superimposed_img)
-    return heatmap_path
+
+    # Analyze affected regions
+    affected_regions = analyze_affected_regions(heatmap)
+    
+    # Generate analysis text
+    analysis_text = generate_analysis_text(affected_regions)
+    
+    return {
+        "heatmap_path": heatmap_path,
+        "affected_regions": affected_regions,
+        "analysis": analysis_text
+    }
+
+def generate_analysis_text(affected_regions):
+    """
+    Generates detailed anatomical analysis of affected regions
+    """
+    if not affected_regions:
+        return "No significant abnormalities detected in any lung region."
+    
+    analysis = "Detailed Regional Analysis:\n\n"
+    
+    # Group regions by severity
+    severity_groups = {
+        "High": [],
+        "Moderate": [],
+        "Low": []
+    }
+    
+    for region in affected_regions:
+        severity_groups[region['severity']].append(region)
+    
+    # Generate detailed analysis for each severity level
+    for severity in ["High", "Moderate", "Low"]:
+        regions = severity_groups[severity]
+        if regions:
+            analysis += f"{severity} Severity Regions:\n"
+            for region in regions:
+                analysis += f"• {region['name']}:\n"
+                analysis += f"  - Affected area: {region['area_affected']*100:.1f}% of region\n"
+                analysis += f"  - Intensity: {region['max_intensity']:.2f}\n"
+            analysis += "\n"
+    
+    # Add clinical interpretation
+    analysis += "Clinical Interpretation:\n"
+    if severity_groups["High"]:
+        right_count = sum(1 for r in severity_groups["High"] if "Right" in r["name"])
+        left_count = sum(1 for r in severity_groups["High"] if "Left" in r["name"])
+        
+        if right_count and left_count:
+            analysis += "Bilateral involvement with significant opacities. "
+        elif right_count:
+            analysis += "Predominant right lung involvement. "
+        else:
+            analysis += "Predominant left lung involvement. "
+            
+        if any("Lower" in r["name"] for r in severity_groups["High"]):
+            analysis += "Notable basal consolidation present."
+    elif severity_groups["Moderate"]:
+        analysis += "Intermediate findings with patchy opacities. Consider early-stage infection or inflammation."
+    else:
+        analysis += "Subtle or minimal findings, possibly representing minor inflammatory changes."
+    
+    return analysis
 
 # Login required decorator
 def login_required(f):
@@ -140,17 +274,31 @@ def predict():
     filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(filepath)
 
-    # Get Prediction
-    diagnosis, probability = predict_pneumonia(filepath)
+    # Get Prediction with affected regions
+    diagnosis, probability, affected_regions = predict_pneumonia(filepath)
 
-    # Generate Activation Heatmap (using the new method)
-    heatmap_path = generate_activation_heatmap(filepath, model)
-    
+    # Generate detailed analysis for affected regions
+    analysis = ""
+    if affected_regions:
+        if diagnosis == "High Risk":
+            analysis = "High Risk Areas Detected:\n"
+            for region in affected_regions:
+                analysis += f"• {region['name']}: {region['severity']} involvement\n"
+                analysis += f"  - Affected area: {region['area_affected']*100:.1f}%\n"
+                analysis += f"  - Intensity: {region['max_intensity']:.2f}\n"
+        elif diagnosis == "Moderate Risk":
+            analysis = "Moderate Risk Areas Detected:\n"
+            for region in affected_regions:
+                analysis += f"• {region['name']}: {region['severity']} involvement\n"
+                analysis += f"  - Affected area: {region['area_affected']*100:.1f}%\n"
+
     return jsonify({
         "diagnosis": diagnosis,
-        "pneumonia_probability": round(float(probability), 4),
-        "heatmap_url": "/heatmap",  # Fixed missing comma
-        "xray_url": f"/img/{filename}"  # Added filename parameter
+        "pneumonia_probability": float(probability),
+        "affected_regions": affected_regions,
+        "analysis": analysis,
+        "xray_url": f"/img/{filename}",
+        "heatmap_url": "/heatmap"
     })
 
 # Route to Serve Heatmap
