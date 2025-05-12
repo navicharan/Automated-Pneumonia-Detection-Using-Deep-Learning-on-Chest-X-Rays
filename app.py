@@ -327,7 +327,7 @@ def get_nearby_hospitals():
     url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
     params = {
         "location": f"{lat},{lng}",
-        "radius": "5000",  # 5km radius
+        "radius": "10000",  # 10km radius
         "type": "hospital",
         "keyword": "hospital",
         "key": API_KEY  # Now using environment variable

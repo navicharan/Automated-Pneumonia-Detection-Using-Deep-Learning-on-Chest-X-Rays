@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pneumonia Detection Result</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-4xl mx-auto p-6">
+        <h1 class="text-3xl font-bold text-center mb-8">Pneumonia Detection Result</h1>
+        
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold mb-2">Diagnosis</h2>
+                <p class="text-lg">{{result.diagnosis}}</p>
+                <p class="text-gray-600">Probability: {{(result.probability * 100)|round(2)}}%</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <h3 class="font-medium mb-2">X-ray Image</h3>
+                    <img src="{{url_for('serve_img', filename=result.xray_path.split('/')[-1])}}" alt="X-ray" class="w-full rounded-lg">
+                </div>
+                <div>
+                    <h3 class="font-medium mb-2">Heatmap Analysis</h3>
+                    <img src="{{url_for('serve_heatmap')}}" alt="Heatmap" class="w-full rounded-lg">
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold mb-2">Affected Regions</h2>
+                {% for region in result.affected_regions %}
+                <div class="mb-2">
+                    <h4 class="font-medium">{{region.name}}</h4>
+                    <p>Severity: <span class="
+                        {% if region.severity == 'High' %}text-red-600
+                        {% elif region.severity == 'Moderate' %}text-yellow-600
+                        {% else %}text-green-600{% endif %}
+                    ">{{region.severity}}</span></p>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold mb-2">Clinical Analysis</h2>
+                <p class="whitespace-pre-line">{{result.analysis_text}}</p>
+            </div>
+
+            <div class="text-center text-sm text-gray-500">
+                <p>Generated on: {{result.created_at.strftime('%Y-%m-%d %H:%M:%S')}}</p>
+                <p class="mt-2">This is an AI-assisted analysis. Please consult with a healthcare professional.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
